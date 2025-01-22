@@ -43,6 +43,17 @@ jobs:
       - name: Deploy to App Runner
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query 'ServiceSummaryList[?ServiceName==`'${{ env.APP_RUNNER_SERVICE }}'`].ServiceArn' --output text)
+          
+          # 서비스 상태 체크
+          while true; do
+            STATUS=$(aws apprunner describe-service --service-arn $SERVICE_ARN --query 'Service.Status' --output text)
+            if [ "$STATUS" = "RUNNING" ]; then
+              break
+            fi
+            echo "Waiting for service to be ready... Current status: $STATUS"
+            sleep 30
+          done
+          
           aws apprunner update-service \
             --service-arn $SERVICE_ARN \
             --source-configuration '{"ImageRepository": {"ImageIdentifier": "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}", "ImageRepositoryType": "ECR"}, "AutoDeploymentsEnabled": true, "AuthenticationConfiguration": {"AccessRoleArn": "${{ secrets.APPRUNNER_SERVICE_ROLE_ARN }}"}}' \
