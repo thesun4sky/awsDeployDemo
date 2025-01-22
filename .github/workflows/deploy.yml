@@ -41,13 +41,9 @@ jobs:
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Deploy to App Runner
-        uses: aws-actions/aws-app-runner-deploy@v1
-        with:
-          service: ${{ env.APP_RUNNER_SERVICE }}
-          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-          access-role-arn: ${{ secrets.APPRUNNER_SERVICE_ROLE_ARN }}
-          region: ${{ secrets.AWS_REGION }}
-          cpu: 1
-          memory: 2GB
-          port: 8080
-          wait-for-service-stability: true
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query 'ServiceSummaryList[?ServiceName==`'${{ env.APP_RUNNER_SERVICE }}'`].ServiceArn' --output text)
+          aws apprunner update-service \
+            --service-arn $SERVICE_ARN \
+            --source-configuration '{"ImageRepository": {"ImageIdentifier": "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}", "ImageRepositoryType": "ECR"}, "AutoDeploymentsEnabled": true, "AuthenticationConfiguration": {"AccessRoleArn": "${{ secrets.APPRUNNER_SERVICE_ROLE_ARN }}"}}' \
+            --region ${{ secrets.AWS_REGION }}
